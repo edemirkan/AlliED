@@ -13,10 +13,12 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  windows-build:
+    name: Build and Package Windows Application
     runs-on: windows-latest
     env:
-      ARTIFACT_NAME: AlliED-windows${{ github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') && '-snapshot' || '' }}
+      ARTIFACT_NAME: allied-windows
+      PACKAGE_NAME: AlliED.zip
 
     steps:
       - name: Check out repository
@@ -31,6 +33,13 @@ jobs:
       - name: Build solution
         run: msbuild AlliED/AlliED.sln /t:Build /p:Configuration=Release /p:Platform="Any CPU" /m
 
+      - name: Set release package name
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          Add-Content -Path $env:GITHUB_ENV -Value "PACKAGE_NAME=AlliED-$version.zip"
+
       - name: Package application
         shell: pwsh
         run: |
@@ -38,17 +47,22 @@ jobs:
           $packageDirectory = "artifacts/AlliED"
           New-Item -ItemType Directory -Path $packageDirectory -Force | Out-Null
           Copy-Item -Path "$outputDirectory/*" -Destination $packageDirectory -Recurse -Force
-          Compress-Archive -Path "$packageDirectory/*" -DestinationPath "artifacts/AlliED.zip" -Force
+          Compress-Archive -Path "$packageDirectory/*" -DestinationPath "artifacts/$env:PACKAGE_NAME" -Force
+
+      - name: Append commit SHA to artifact name
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_ENV -Value "ARTIFACT_NAME=allied-windows-$($env:GITHUB_SHA.Substring(0, 7))"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: artifacts/AlliED.zip
+          path: artifacts/${{ env.PACKAGE_NAME }}
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/AlliED.zip
+          files: artifacts/${{ env.PACKAGE_NAME }}
           generate_release_notes: true
