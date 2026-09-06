@@ -50,7 +50,7 @@ jobs:
           Compress-Archive -Path "$packageDirectory/*" -DestinationPath "artifacts/$env:PACKAGE_NAME" -Force
 
       - name: Append commit SHA to artifact name
-        if: github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: Add-Content -Path $env:GITHUB_ENV -Value "ARTIFACT_NAME=AlliED-Windows-$($env:GITHUB_SHA.Substring(0, 7))"
 
